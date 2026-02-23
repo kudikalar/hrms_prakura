@@ -45,6 +45,7 @@ function App() {
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/audit-logs" element={<AuditLogs />} />
                   <Route path="/company" element={<CompanySettings />} />
+                  <Route path="/lifecycle" element={<EmployeeLifecycle />} />
                 </Routes>
               </AdminLayout>
             ) : (
