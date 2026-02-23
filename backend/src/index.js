@@ -59,6 +59,7 @@ app.use('/api/v1/admin/reports', reportsRoutes);
 app.use('/api/v1/admin/audit', auditRoutes);
 app.use('/api/v1/admin/company', companyRoutes);
 app.use('/api/v1/admin/lifecycle', lifecycleRoutes);
+app.use('/api/v1/employee', employeeRoutes);
 
 // Error Handler
 app.use((err, req, res, next) => {
