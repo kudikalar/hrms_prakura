@@ -116,7 +116,10 @@ const Users = () => {
         lastName: user.lastName,
         role: user.role,
         phone: user.phone || '',
-        salary: user.salary || ''
+        salary: user.salary || '',
+        dateOfJoining: user.dateOfJoining ? user.dateOfJoining.split('T')[0] : '',
+        departmentId: user.departmentId || '',
+        designationId: user.designationId || ''
       });
     } else {
       setEditingUser(null);
@@ -127,7 +130,10 @@ const Users = () => {
         lastName: '',
         role: 'EMPLOYEE',
         phone: '',
-        salary: ''
+        salary: '',
+        dateOfJoining: '',
+        departmentId: '',
+        designationId: ''
       });
     }
     setDialogOpen(true);
