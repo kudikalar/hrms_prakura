@@ -95,6 +95,7 @@ model User {
   attendance  Attendance[]
   leaves      Leave[]
   employmentHistory EmploymentHistory[]
+  onboarding  Onboarding?
 
   @@index([companyId])
   @@index([email])
