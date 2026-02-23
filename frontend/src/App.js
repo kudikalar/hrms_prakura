@@ -14,6 +14,7 @@ import Holidays from './pages/Holidays';
 import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
 import CompanySettings from './pages/CompanySettings';
+import EmployeeLifecycle from './pages/EmployeeLifecycle';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
