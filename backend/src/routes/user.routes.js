@@ -21,9 +21,9 @@ const createUserSchema = z.object({
     lastName: z.string().min(2),
     role: z.enum(['ADMIN', 'HR', 'EMPLOYEE']),
     phone: z.string().optional(),
-    departmentId: z.string().uuid().optional(),
-    designationId: z.string().uuid().optional(),
-    joiningDate: z.string().optional(),
+    departmentId: z.string().uuid().optional().nullable(),
+    designationId: z.string().uuid().optional().nullable(),
+    dateOfJoining: z.string().optional(),
     salary: z.number().optional()
   })
 });
