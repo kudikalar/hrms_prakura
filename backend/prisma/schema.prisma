@@ -167,6 +167,27 @@ model LeavePolicy {
 enum LeaveStatus {
   PENDING
   APPROVED
+
+model EmploymentHistory {
+  id            String    @id @default(uuid())
+  employeeId    String
+  companyId     String
+  eventType     EventType
+  oldValue      String?
+  newValue      String?
+  effectiveDate DateTime
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+
+  employee User    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([companyId])
+  @@map("employment_history")
+}
+
   REJECTED
 }
 
