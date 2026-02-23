@@ -254,6 +254,8 @@ const Users = () => {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Department</TableHead>
+              <TableHead>DOJ</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Salary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -262,7 +264,7 @@ const Users = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
@@ -270,7 +272,7 @@ const Users = () => {
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                   No users found
                 </TableCell>
               </TableRow>
@@ -282,6 +284,12 @@ const Users = () => {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
+                  <TableCell>{user.department?.name || 'N/A'}</TableCell>
+                  <TableCell>
+                    {user.dateOfJoining 
+                      ? new Date(user.dateOfJoining).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : 'Not set'}
+                  </TableCell>
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
                   <TableCell>${user.salary?.toLocaleString() || 'N/A'}</TableCell>
                   <TableCell className="text-right">
