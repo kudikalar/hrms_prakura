@@ -44,6 +44,27 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum EmploymentStatus {
+  ACTIVE
+  EXITED
+}
+
+enum ExitType {
+  RESIGNED
+  TERMINATED
+  CONTRACT_END
+}
+
+enum EventType {
+  JOINED
+  DEPARTMENT_CHANGE
+  ROLE_CHANGE
+  DESIGNATION_CHANGE
+  SALARY_REVISION
+  PROMOTION
+  EXIT
+}
+
 model User {
   id           String     @id @default(uuid())
   companyId    String
@@ -58,6 +79,11 @@ model User {
   designationId String?
   joiningDate  DateTime?
   salary       Float?
+  dateOfJoining DateTime?
+  exitDate      DateTime?
+  exitReason    String?
+  exitType      ExitType?
+  employmentStatus EmploymentStatus @default(ACTIVE)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -67,6 +93,7 @@ model User {
   payrolls    Payroll[]
   attendance  Attendance[]
   leaves      Leave[]
+  employmentHistory EmploymentHistory[]
 
   @@index([companyId])
   @@index([email])
