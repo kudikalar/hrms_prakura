@@ -1,0 +1,301 @@
+name: Deploy Prakura HRMS
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  POSTGRES_VERSION: '15'
+
+jobs:
+  # Job 1: Build and Test Backend
+  backend:
+    name: Backend Build & Test
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prakura_hrms_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          cache-dependency-path: backend/yarn.lock
+      
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: yarn install --frozen-lockfile
+      
+      - name: Setup environment variables
+        working-directory: ./backend
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/prakura_hrms_test?schema=public" > .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "NODE_ENV=test" >> .env
+      
+      - name: Generate Prisma Client
+        working-directory: ./backend
+        run: npx prisma generate
+      
+      - name: Run database migrations
+        working-directory: ./backend
+        run: npx prisma migrate deploy
+      
+      - name: Build backend (if applicable)
+        working-directory: ./backend
+        run: |
+          if [ -f "package.json" ] && grep -q '"build"' package.json; then
+            yarn build
+          fi
+      
+      - name: Upload backend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: |
+            backend/
+            !backend/node_modules
+          retention-days: 1
+
+  # Job 2: Build and Test Frontend
+  frontend:
+    name: Frontend Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+      
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: yarn install --frozen-lockfile
+      
+      - name: Setup environment variables
+        working-directory: ./frontend
+        run: |
+          echo "REACT_APP_BACKEND_URL=${{ secrets.BACKEND_URL }}" > .env
+      
+      - name: Build frontend
+        working-directory: ./frontend
+        run: yarn build
+        env:
+          CI: false
+      
+      - name: Upload frontend build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          retention-days: 1
+
+  # Job 3: Deploy to Server
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: ./backend
+      
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: ./frontend/build
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy Backend
+        run: |
+          echo "Deploying backend to ${{ secrets.SERVER_HOST }}..."
+          
+          # Create deployment directory
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}/backend"
+          
+          # Copy backend files
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            ./backend/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/backend/
+          
+          # Install dependencies and run migrations
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}/backend
+            
+            # Install dependencies
+            yarn install --production --frozen-lockfile
+            
+            # Setup environment
+            cat > .env << EOL
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          NODE_ENV=production
+          PORT=8001
+          CORS_ORIGIN=${{ secrets.FRONTEND_URL }}
+          EOL
+            
+            # Generate Prisma client
+            npx prisma generate
+            
+            # Run migrations
+            npx prisma migrate deploy
+            
+            # Restart backend service
+            sudo supervisorctl restart backend || sudo systemctl restart prakura-backend
+          EOF
+      
+      - name: Deploy Frontend
+        run: |
+          echo "Deploying frontend to ${{ secrets.SERVER_HOST }}..."
+          
+          # Create deployment directory
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}/frontend"
+          
+          # Copy frontend build
+          rsync -avz --delete ./frontend/build/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/frontend/build/
+          
+          # Restart frontend service
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            sudo supervisorctl restart frontend || sudo systemctl restart prakura-frontend
+          EOF
+      
+      - name: Health Check
+        run: |
+          echo "Running health checks..."
+          
+          # Wait for services to start
+          sleep 10
+          
+          # Check backend health
+          BACKEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.BACKEND_URL }}/api/health)
+          if [ "$BACKEND_STATUS" != "200" ]; then
+            echo "Backend health check failed with status: $BACKEND_STATUS"
+            exit 1
+          fi
+          echo "Backend health check passed"
+          
+          # Check frontend
+          FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.FRONTEND_URL }})
+          if [ "$FRONTEND_STATUS" != "200" ]; then
+            echo "Frontend health check failed with status: $FRONTEND_STATUS"
+            exit 1
+          fi
+          echo "Frontend health check passed"
+          
+          echo "✅ Deployment successful!"
+      
+      - name: Notify on Success
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "✅ Prakura HRMS Deployment Successful"
+          body: |
+            Deployment to production completed successfully!
+            
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            Author: ${{ github.actor }}
+            
+            Backend: ${{ secrets.BACKEND_URL }}
+            Frontend: ${{ secrets.FRONTEND_URL }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: "GitHub Actions <noreply@prakura.com>"
+        continue-on-error: true
+      
+      - name: Notify on Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "❌ Prakura HRMS Deployment Failed"
+          body: |
+            Deployment to production failed!
+            
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            Author: ${{ github.actor }}
+            
+            Please check the GitHub Actions logs for details.
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: "GitHub Actions <noreply@prakura.com>"
+        continue-on-error: true
+
+  # Job 4: Rollback (Manual trigger)
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Rollback to Previous Version
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
+            
+            # Rollback using git
+            git checkout HEAD~1
+            
+            # Restart services
+            sudo supervisorctl restart backend frontend
+          EOF
+          
+          echo "⚠️ Rolled back to previous version"

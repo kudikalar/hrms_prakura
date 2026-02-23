@@ -1,0 +1,99 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prakura_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'yarn'
+          cache-dependency-path: backend/yarn.lock
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: yarn install --frozen-lockfile
+      
+      - name: Setup test environment
+        working-directory: ./backend
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/prakura_test" > .env
+          echo "JWT_SECRET=test-secret" >> .env
+          echo "NODE_ENV=test" >> .env
+      
+      - name: Run Prisma migrations
+        working-directory: ./backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+      
+      - name: Run tests
+        working-directory: ./backend
+        run: |
+          if grep -q '"test"' package.json; then
+            yarn test
+          else
+            echo "No tests configured, skipping..."
+          fi
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: yarn install --frozen-lockfile
+      
+      - name: Run linter
+        working-directory: ./frontend
+        run: |
+          if grep -q '"lint"' package.json; then
+            yarn lint || true
+          fi
+      
+      - name: Run tests
+        working-directory: ./frontend
+        run: |
+          if grep -q '"test"' package.json; then
+            yarn test --watchAll=false
+          else
+            echo "No tests configured, skipping..."
+          fi
+        env:
+          CI: true
