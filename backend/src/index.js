@@ -16,6 +16,7 @@ const auditRoutes = require('./routes/audit.routes');
 const companyRoutes = require('./routes/company.routes');
 const lifecycleRoutes = require('./routes/lifecycle.routes');
 const employeeRoutes = require('./routes/employee.routes');
+const hrRoutes = require('./routes/hr.routes');
 
 const app = express();
 const PORT = process.env.PORT || 8001;
