@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import axios from 'axios';
 import { fetchUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../store/usersSlice';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -28,8 +29,10 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { UserPlus, Search, Edit, Trash2, Ban, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, Ban, CheckCircle, Building2, Briefcase, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Users = () => {
   const dispatch = useDispatch();
