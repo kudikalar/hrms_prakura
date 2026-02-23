@@ -365,7 +365,7 @@ const Users = () => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="user-dialog">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" data-testid="user-dialog">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Edit User' : 'Create New User'}</DialogTitle>
             <DialogDescription>
@@ -376,7 +376,7 @@ const Users = () => {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
                     id="firstName"
                     value={formData.firstName}
@@ -386,7 +386,7 @@ const Users = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">Last Name *</Label>
                   <Input
                     id="lastName"
                     value={formData.lastName}
@@ -397,7 +397,7 @@ const Users = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -410,7 +410,7 @@ const Users = () => {
               </div>
               {!editingUser && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
                     id="password"
                     type="password"
@@ -422,37 +422,101 @@ const Users = () => {
                   />
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger data-testid="user-role-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EMPLOYEE">Employee</SelectItem>
-                    <SelectItem value="HR">HR</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                    <SelectTrigger data-testid="user-role-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                      <SelectItem value="HR">HR</SelectItem>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfJoining">
+                    <Calendar className="inline-block w-4 h-4 mr-1" />
+                    Date of Joining
+                  </Label>
+                  <Input
+                    id="dateOfJoining"
+                    type="date"
+                    value={formData.dateOfJoining}
+                    onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                    data-testid="user-doj-input"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone (Optional)</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  data-testid="user-phone-input"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="departmentId">
+                    <Building2 className="inline-block w-4 h-4 mr-1" />
+                    Department
+                  </Label>
+                  <Select 
+                    value={formData.departmentId} 
+                    onValueChange={(value) => setFormData({ ...formData, departmentId: value, designationId: '' })}
+                  >
+                    <SelectTrigger data-testid="user-department-select">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=" ">None</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="designationId">
+                    <Briefcase className="inline-block w-4 h-4 mr-1" />
+                    Designation
+                  </Label>
+                  <Select 
+                    value={formData.designationId} 
+                    onValueChange={(value) => setFormData({ ...formData, designationId: value })}
+                    disabled={!formData.departmentId}
+                  >
+                    <SelectTrigger data-testid="user-designation-select">
+                      <SelectValue placeholder={formData.departmentId ? "Select designation" : "Select department first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=" ">None</SelectItem>
+                      {filteredDesignations.map((desig) => (
+                        <SelectItem key={desig.id} value={desig.id}>
+                          {desig.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary (Optional)</Label>
-                <Input
-                  id="salary"
-                  type="number"
-                  value={formData.salary}
-                  onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                  data-testid="user-salary-input"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone (Optional)</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    data-testid="user-phone-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="salary">Salary (Optional)</Label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={formData.salary}
+                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                    data-testid="user-salary-input"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>
