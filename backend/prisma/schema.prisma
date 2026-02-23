@@ -168,6 +168,8 @@ model LeavePolicy {
 enum LeaveStatus {
   PENDING
   APPROVED
+  REJECTED
+}
 
 model EmploymentHistory {
   id            String    @id @default(uuid())
@@ -187,9 +189,6 @@ model EmploymentHistory {
   @@index([employeeId])
   @@index([companyId])
   @@map("employment_history")
-}
-
-  REJECTED
 }
 
 model Leave {
