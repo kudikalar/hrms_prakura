@@ -15,7 +15,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Timeline
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
