@@ -27,6 +27,7 @@ model Company {
   holidays      Holiday[]
   auditLogs     AuditLog[]
   loginLogs     LoginLog[]
+  employmentHistory EmploymentHistory[]
 
   @@map("companies")
 }
