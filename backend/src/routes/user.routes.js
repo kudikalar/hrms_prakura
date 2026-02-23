@@ -144,7 +144,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { password, email, ...updateData } = req.body;
+    const { password, email, dateOfJoining, departmentId, designationId, ...updateData } = req.body;
 
     const existingUser = await prisma.user.findFirst({
       where: { id, companyId: req.companyId }
@@ -154,14 +154,47 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Clean up empty strings for optional fields
+    const cleanDepartmentId = departmentId && departmentId.trim() !== '' ? departmentId : null;
+    const cleanDesignationId = designationId && designationId.trim() !== '' ? designationId : null;
+
+    // Track changes for employment history
+    const changes = [];
+    if (existingUser.departmentId !== cleanDepartmentId) {
+      changes.push({ type: 'DEPARTMENT_CHANGE', old: existingUser.departmentId, new: cleanDepartmentId });
+    }
+    if (existingUser.designationId !== cleanDesignationId) {
+      changes.push({ type: 'DESIGNATION_CHANGE', old: existingUser.designationId, new: cleanDesignationId });
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : existingUser.dateOfJoining,
+        departmentId: cleanDepartmentId,
+        designationId: cleanDesignationId
+      },
       include: {
         department: true,
         designation: true
       }
     });
+
+    // Create employment history events for significant changes
+    for (const change of changes) {
+      await prisma.employmentHistory.create({
+        data: {
+          employeeId: id,
+          companyId: req.companyId,
+          eventType: change.type,
+          oldValue: change.old || 'None',
+          newValue: change.new || 'None',
+          effectiveDate: new Date(),
+          createdBy: req.user.id
+        }
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
