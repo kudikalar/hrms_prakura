@@ -143,7 +143,10 @@ const Users = () => {
     e.preventDefault();
     const data = {
       ...formData,
-      salary: formData.salary ? parseFloat(formData.salary) : undefined
+      salary: formData.salary ? parseFloat(formData.salary) : undefined,
+      dateOfJoining: formData.dateOfJoining || undefined,
+      departmentId: formData.departmentId || undefined,
+      designationId: formData.designationId || undefined
     };
 
     if (editingUser) {
