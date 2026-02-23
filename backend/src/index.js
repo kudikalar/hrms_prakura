@@ -18,6 +18,9 @@ const companyRoutes = require('./routes/company.routes');
 const app = express();
 const PORT = process.env.PORT || 8001;
 
+// Trust proxy for rate limiting behind reverse proxy
+app.set('trust proxy', 1);
+
 // Security Middleware
 app.use(helmet());
 app.use(cors({
