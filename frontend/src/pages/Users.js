@@ -42,6 +42,9 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [filteredDesignations, setFilteredDesignations] = useState([]);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -49,8 +52,46 @@ const Users = () => {
     lastName: '',
     role: 'EMPLOYEE',
     phone: '',
-    salary: ''
+    salary: '',
+    dateOfJoining: '',
+    departmentId: '',
+    designationId: ''
   });
+
+  const getAuthHeaders = () => ({
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+  });
+
+  // Fetch departments and designations on mount
+  useEffect(() => {
+    const fetchDepartmentsAndDesignations = async () => {
+      try {
+        const [deptRes, desigRes] = await Promise.all([
+          axios.get(`${API_URL}/api/v1/admin/departments`, getAuthHeaders()),
+          axios.get(`${API_URL}/api/v1/admin/designations`, getAuthHeaders())
+        ]);
+        setDepartments(deptRes.data);
+        setDesignations(desigRes.data);
+      } catch (error) {
+        console.error('Failed to fetch departments/designations:', error);
+      }
+    };
+    fetchDepartmentsAndDesignations();
+  }, []);
+
+  // Filter designations based on selected department
+  useEffect(() => {
+    if (formData.departmentId) {
+      const filtered = designations.filter(d => d.departmentId === formData.departmentId);
+      setFilteredDesignations(filtered);
+      // Clear designation if it doesn't belong to the selected department
+      if (formData.designationId && !filtered.find(d => d.id === formData.designationId)) {
+        setFormData(prev => ({ ...prev, designationId: '' }));
+      }
+    } else {
+      setFilteredDesignations(designations);
+    }
+  }, [formData.departmentId, designations]);
 
   useEffect(() => {
     loadUsers();
