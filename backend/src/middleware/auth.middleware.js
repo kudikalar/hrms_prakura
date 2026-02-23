@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
-const { logger } = require('./logger');
+const { logger } = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
