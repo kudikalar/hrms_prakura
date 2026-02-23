@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import axios from 'axios';
 import { fetchUsers, createUser, updateUser, updateUserStatus, deleteUser } from '../store/usersSlice';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -28,8 +29,10 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { UserPlus, Search, Edit, Trash2, Ban, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, Ban, CheckCircle, Building2, Briefcase, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Users = () => {
   const dispatch = useDispatch();
@@ -39,6 +42,9 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [filteredDesignations, setFilteredDesignations] = useState([]);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -46,8 +52,46 @@ const Users = () => {
     lastName: '',
     role: 'EMPLOYEE',
     phone: '',
-    salary: ''
+    salary: '',
+    dateOfJoining: '',
+    departmentId: '',
+    designationId: ''
   });
+
+  const getAuthHeaders = () => ({
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+  });
+
+  // Fetch departments and designations on mount
+  useEffect(() => {
+    const fetchDepartmentsAndDesignations = async () => {
+      try {
+        const [deptRes, desigRes] = await Promise.all([
+          axios.get(`${API_URL}/api/v1/admin/departments`, getAuthHeaders()),
+          axios.get(`${API_URL}/api/v1/admin/designations`, getAuthHeaders())
+        ]);
+        setDepartments(deptRes.data);
+        setDesignations(desigRes.data);
+      } catch (error) {
+        console.error('Failed to fetch departments/designations:', error);
+      }
+    };
+    fetchDepartmentsAndDesignations();
+  }, []);
+
+  // Filter designations based on selected department
+  useEffect(() => {
+    if (formData.departmentId) {
+      const filtered = designations.filter(d => d.departmentId === formData.departmentId);
+      setFilteredDesignations(filtered);
+      // Clear designation if it doesn't belong to the selected department
+      if (formData.designationId && !filtered.find(d => d.id === formData.designationId)) {
+        setFormData(prev => ({ ...prev, designationId: '' }));
+      }
+    } else {
+      setFilteredDesignations(designations);
+    }
+  }, [formData.departmentId, designations]);
 
   useEffect(() => {
     loadUsers();
@@ -72,7 +116,10 @@ const Users = () => {
         lastName: user.lastName,
         role: user.role,
         phone: user.phone || '',
-        salary: user.salary || ''
+        salary: user.salary || '',
+        dateOfJoining: user.dateOfJoining ? user.dateOfJoining.split('T')[0] : '',
+        departmentId: user.departmentId || '',
+        designationId: user.designationId || ''
       });
     } else {
       setEditingUser(null);
@@ -83,7 +130,10 @@ const Users = () => {
         lastName: '',
         role: 'EMPLOYEE',
         phone: '',
-        salary: ''
+        salary: '',
+        dateOfJoining: '',
+        departmentId: '',
+        designationId: ''
       });
     }
     setDialogOpen(true);
@@ -93,7 +143,10 @@ const Users = () => {
     e.preventDefault();
     const data = {
       ...formData,
-      salary: formData.salary ? parseFloat(formData.salary) : undefined
+      salary: formData.salary ? parseFloat(formData.salary) : undefined,
+      dateOfJoining: formData.dateOfJoining || undefined,
+      departmentId: formData.departmentId || undefined,
+      designationId: formData.designationId || undefined
     };
 
     if (editingUser) {
@@ -201,6 +254,8 @@ const Users = () => {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Department</TableHead>
+              <TableHead>DOJ</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Salary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -209,7 +264,7 @@ const Users = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
@@ -217,7 +272,7 @@ const Users = () => {
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                   No users found
                 </TableCell>
               </TableRow>
@@ -229,6 +284,12 @@ const Users = () => {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
+                  <TableCell>{user.department?.name || 'N/A'}</TableCell>
+                  <TableCell>
+                    {user.dateOfJoining 
+                      ? new Date(user.dateOfJoining).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : 'Not set'}
+                  </TableCell>
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
                   <TableCell>${user.salary?.toLocaleString() || 'N/A'}</TableCell>
                   <TableCell className="text-right">
@@ -304,7 +365,7 @@ const Users = () => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="user-dialog">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" data-testid="user-dialog">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Edit User' : 'Create New User'}</DialogTitle>
             <DialogDescription>
@@ -315,7 +376,7 @@ const Users = () => {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
                     id="firstName"
                     value={formData.firstName}
@@ -325,7 +386,7 @@ const Users = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">Last Name *</Label>
                   <Input
                     id="lastName"
                     value={formData.lastName}
@@ -336,7 +397,7 @@ const Users = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -349,7 +410,7 @@ const Users = () => {
               </div>
               {!editingUser && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
                     id="password"
                     type="password"
@@ -361,37 +422,101 @@ const Users = () => {
                   />
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger data-testid="user-role-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EMPLOYEE">Employee</SelectItem>
-                    <SelectItem value="HR">HR</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                    <SelectTrigger data-testid="user-role-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                      <SelectItem value="HR">HR</SelectItem>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfJoining">
+                    <Calendar className="inline-block w-4 h-4 mr-1" />
+                    Date of Joining
+                  </Label>
+                  <Input
+                    id="dateOfJoining"
+                    type="date"
+                    value={formData.dateOfJoining}
+                    onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                    data-testid="user-doj-input"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone (Optional)</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  data-testid="user-phone-input"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="departmentId">
+                    <Building2 className="inline-block w-4 h-4 mr-1" />
+                    Department
+                  </Label>
+                  <Select 
+                    value={formData.departmentId} 
+                    onValueChange={(value) => setFormData({ ...formData, departmentId: value, designationId: '' })}
+                  >
+                    <SelectTrigger data-testid="user-department-select">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=" ">None</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="designationId">
+                    <Briefcase className="inline-block w-4 h-4 mr-1" />
+                    Designation
+                  </Label>
+                  <Select 
+                    value={formData.designationId} 
+                    onValueChange={(value) => setFormData({ ...formData, designationId: value })}
+                    disabled={!formData.departmentId}
+                  >
+                    <SelectTrigger data-testid="user-designation-select">
+                      <SelectValue placeholder={formData.departmentId ? "Select designation" : "Select department first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=" ">None</SelectItem>
+                      {filteredDesignations.map((desig) => (
+                        <SelectItem key={desig.id} value={desig.id}>
+                          {desig.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary (Optional)</Label>
-                <Input
-                  id="salary"
-                  type="number"
-                  value={formData.salary}
-                  onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                  data-testid="user-salary-input"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone (Optional)</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    data-testid="user-phone-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="salary">Salary (Optional)</Label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={formData.salary}
+                    onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                    data-testid="user-salary-input"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>

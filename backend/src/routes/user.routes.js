@@ -21,9 +21,9 @@ const createUserSchema = z.object({
     lastName: z.string().min(2),
     role: z.enum(['ADMIN', 'HR', 'EMPLOYEE']),
     phone: z.string().optional(),
-    departmentId: z.string().uuid().optional(),
-    designationId: z.string().uuid().optional(),
-    joiningDate: z.string().optional(),
+    departmentId: z.string().uuid().optional().nullable(),
+    designationId: z.string().uuid().optional().nullable(),
+    dateOfJoining: z.string().optional(),
     salary: z.number().optional()
   })
 });
@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
 // Create User
 router.post('/', validate(createUserSchema), async (req, res) => {
   try {
-    const { email, password, ...userData } = req.body;
+    const { email, password, dateOfJoining, departmentId, designationId, ...userData } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -87,11 +87,18 @@ router.post('/', validate(createUserSchema), async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Clean up empty strings for optional fields
+    const cleanDepartmentId = departmentId && departmentId.trim() !== '' ? departmentId : null;
+    const cleanDesignationId = designationId && designationId.trim() !== '' ? designationId : null;
+
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         companyId: req.companyId,
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
+        departmentId: cleanDepartmentId,
+        designationId: cleanDesignationId,
         ...userData
       },
       include: {
@@ -99,6 +106,20 @@ router.post('/', validate(createUserSchema), async (req, res) => {
         designation: true
       }
     });
+
+    // Create employment history event if dateOfJoining is set
+    if (dateOfJoining) {
+      await prisma.employmentHistory.create({
+        data: {
+          employeeId: user.id,
+          companyId: req.companyId,
+          eventType: 'JOINED',
+          newValue: 'Joined',
+          effectiveDate: new Date(dateOfJoining),
+          createdBy: req.user.id
+        }
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -123,7 +144,7 @@ router.post('/', validate(createUserSchema), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { password, email, ...updateData } = req.body;
+    const { password, email, dateOfJoining, departmentId, designationId, ...updateData } = req.body;
 
     const existingUser = await prisma.user.findFirst({
       where: { id, companyId: req.companyId }
@@ -133,14 +154,47 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Clean up empty strings for optional fields
+    const cleanDepartmentId = departmentId && departmentId.trim() !== '' ? departmentId : null;
+    const cleanDesignationId = designationId && designationId.trim() !== '' ? designationId : null;
+
+    // Track changes for employment history
+    const changes = [];
+    if (existingUser.departmentId !== cleanDepartmentId) {
+      changes.push({ type: 'DEPARTMENT_CHANGE', old: existingUser.departmentId, new: cleanDepartmentId });
+    }
+    if (existingUser.designationId !== cleanDesignationId) {
+      changes.push({ type: 'DESIGNATION_CHANGE', old: existingUser.designationId, new: cleanDesignationId });
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : existingUser.dateOfJoining,
+        departmentId: cleanDepartmentId,
+        designationId: cleanDesignationId
+      },
       include: {
         department: true,
         designation: true
       }
     });
+
+    // Create employment history events for significant changes
+    for (const change of changes) {
+      await prisma.employmentHistory.create({
+        data: {
+          employeeId: id,
+          companyId: req.companyId,
+          eventType: change.type,
+          oldValue: change.old || 'None',
+          newValue: change.new || 'None',
+          effectiveDate: new Date(),
+          createdBy: req.user.id
+        }
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
