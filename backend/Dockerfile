@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production
+
+COPY . .
+
+RUN npx prisma generate
+
+EXPOSE 8001
+
+CMD ["node", "src/index.js"]
