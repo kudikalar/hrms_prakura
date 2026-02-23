@@ -37,6 +37,7 @@ const AdminLayout = ({ children }) => {
   const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/users', icon: Users, label: 'User Management' },
+    { path: '/admin/lifecycle', icon: Timeline, label: 'Employee Lifecycle' },
     { path: '/admin/departments', icon: Building2, label: 'Departments' },
     { path: '/admin/designations', icon: Briefcase, label: 'Designations' },
     { path: '/admin/leave-policy', icon: CalendarDays, label: 'Leave Policy' },
