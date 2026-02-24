@@ -15,7 +15,7 @@ const authMiddleware = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      include: { company: true }
+      include: { company: true, department: true, designation: true }
     });
 
     if (!user || user.status !== 'ACTIVE') {
@@ -38,6 +38,13 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const hrMiddleware = (req, res, next) => {
+  if (!['HR', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'HR access required' });
+  }
+  next();
+};
+
 const superAdminOnly = (req, res, next) => {
   if (req.user.role !== 'SUPER_ADMIN') {
     return res.status(403).json({ error: 'Super admin access required' });
@@ -45,4 +52,4 @@ const superAdminOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { authMiddleware, adminOnly, superAdminOnly };
+module.exports = { authMiddleware, adminOnly, hrMiddleware, superAdminOnly };

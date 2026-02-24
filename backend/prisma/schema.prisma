@@ -95,6 +95,7 @@ model User {
   attendance  Attendance[]
   leaves      Leave[]
   employmentHistory EmploymentHistory[]
+  onboarding  Onboarding?
 
   @@index([companyId])
   @@index([email])
@@ -307,4 +308,51 @@ model LoginLog {
   @@index([companyId])
   @@index([email])
   @@map("login_logs")
+}
+
+// Onboarding Management
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Onboarding {
+  id              String            @id @default(uuid())
+  userId          String            @unique
+  companyId       String
+  status          OnboardingStatus  @default(NOT_STARTED)
+  startDate       DateTime?
+  completedDate   DateTime?
+  assignedHrId    String?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks           OnboardingTask[]
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("onboardings")
+}
+
+model OnboardingTask {
+  id              String   @id @default(uuid())
+  onboardingId    String
+  taskName        String
+  description     String?
+  category        String   // DOCUMENTS, IT_SETUP, TRAINING, COMPLIANCE, etc.
+  isCompleted     Boolean  @default(false)
+  completedAt     DateTime?
+  completedBy     String?
+  dueDate         DateTime?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  onboarding      Onboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+
+  @@index([onboardingId])
+  @@map("onboarding_tasks")
 }
